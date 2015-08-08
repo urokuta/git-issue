@@ -35,6 +35,8 @@ class GitIssue::Github < GitIssue::Base
     cl = super
     cl << GitIssue::Command.new(:mention, :men, 'create a comment to given issue')
     cl << GitIssue::Command.new(:close , :cl, 'close an issue with comment. comment is optional.')
+    cl << GitIssue::Command.new(:all_created , :ac, 'listing issues created by you in all projects')
+    cl << GitIssue::Command.new(:all_assigned , :aa, 'listing issues assigned to you in all projects')
   end
 
   def show(options = {})
@@ -70,10 +72,16 @@ class GitIssue::Github < GitIssue::Base
     params[:state] ||= "open"
     params[:per_page] = options[:max_count] || 30
 
-    url = to_url("repos", @repo, 'issues')
+    if options[:all_projects]
+      params[:filter] = options[:filter]
+      url = to_url('issues')
+    else
+      url = to_url("repos", @repo, 'issues')
+    end
 
     issues = fetch_json(url, options, params)
     issues = issues.sort_by{|i| i['number'].to_i} unless params[:sort] || params[:direction]
+    issues = issues.map{|i|i['repo_name'] = i['html_url'].split("/")[4];i}
 
     t_max = issues.map{|i| mlength(i['title'])}.max
     l_max = issues.map{|i| mlength(i['labels'].map{|l| l['name']}.join(","))}.max
@@ -82,8 +90,9 @@ class GitIssue::Github < GitIssue::Base
     or_zero = lambda{|v| v.blank? ? "0" : v }
 
     issues.each do |i|
-      puts sprintf("%s  %s  %s  %s  %s c:%s v:%s p:%s %s %s",
+      puts sprintf("%s  %s %s  %s  %s  %s c:%s v:%s p:%s %s %s",
                    apply_fmt_colors(:id, sprintf('#%-4d', i['number'].to_i)),
+                   apply_fmt_colors(:repo_name, truncate(i['repo_name'], 8)),
                    apply_fmt_colors(:state, i['state']),
                    mljust(i['title'], t_max),
                    apply_fmt_colors(:login, mljust(i['user']['login'], u_max)),
@@ -100,6 +109,14 @@ class GitIssue::Github < GitIssue::Base
 
   def mine(options = {})
     list(options.merge(:assignee => @user))
+  end
+
+  def all_created(options = {})
+    list(options.merge({all_projects: true, filter: :created}))
+  end
+
+  def all_assigned(options = {})
+    list(options.merge({all_projects: true, filter: :assigned}))
   end
 
   def add(options = {})
@@ -433,7 +450,7 @@ class GitIssue::Github < GitIssue::Base
 
   def fmt_colors
     @fmt_colors ||= { :id => [:bold, :cyan], :state => :blue,
-      :login => :magenta, :labels => :yellow}
+      :login => :magenta, :labels => :yellow, :repo_name => :green}
   end
 
 end

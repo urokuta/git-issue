@@ -221,6 +221,14 @@ class GitIssue::Base
     cnt + width
   end
 
+  def truncate(s, n)
+    if s.length > n
+      s = s[0..(n -2)] + ".."
+    else
+      mljust(s, n)
+    end
+  end
+
   # this is unnecessary hacks for multibytes charactors handling...
   def mljust(s, n)
     return "" unless s
